@@ -4,7 +4,6 @@ import math
 from os import listdir
 from os.path import isfile, join
 import pygame
-import subprocess as sp
 
 pygame.init()
 pygame.display.set_caption("Platformer")
@@ -56,7 +55,7 @@ def get_block(size):
     path = join("assets","Terrain","Terrain.png")
     image = pygame.image.load(path).convert_alpha()
     surface = pygame.Surface((size,size), pygame.SRCALPHA, 32)
-    rect = pygame.Rect(0, 0, size, size)
+    rect = pygame.Rect(0,126, size, size)
     surface.blit(image, (0,0), rect)
     return pygame.transform.scale2x(surface)
 
@@ -79,8 +78,15 @@ class Player(pygame.sprite.Sprite):
         self.jump_count = 0
         self.hit = False
         self.hit_count = 0
-        self.lives = 10
+        self.lives = 10000000000000000000000000000
         self.game_over = False
+        self.score = 0
+    
+    def make_point(self):
+        self.score += 1
+        if self.score >= 10:
+            self.lives += 1
+            self.score = 0
 
     def make_hit(self):
         self.hit = True
@@ -164,13 +170,6 @@ class Player(pygame.sprite.Sprite):
         win.blit(lives_text, (5, 5))  # 5 pixels padding from the top-left corner    
         win.blit(self.sprite,(self.rect.x - offset_x,self.rect.y - offset_y))
         
-    def next_phase(self):
-        pygame.quit()    
-        # Start the external Python script
-        extProc = sp.Popen(['python', 'code_3.py'])
-
-        # Terminate the current process
-        sp.Popen.terminate(sp.Popen(['python', 'code_2.py']))
 
 class Enemy(pygame.sprite.Sprite):
     COLOR = (255,0,0)
@@ -180,7 +179,7 @@ class Enemy(pygame.sprite.Sprite):
     def __init__(self, x, y, width, height,name=None):
         super().__init__()
         self.rect = pygame.Rect(x,y,width,height)
-        self.sprites = load_sprite_sheets("MainCharacters","PinkMan", 32, 32, True)
+        self.sprites = load_sprite_sheets("MainCharacters","MaskDude", 32, 32, True)
         self.name = 'enemy'
         self.x_vel = -5
         self.y_vel = 0
@@ -248,6 +247,83 @@ class Enemy(pygame.sprite.Sprite):
             sprite_sheet = "run"
         
         sprite_sheet_name = sprite_sheet + "_" + self.direction
+        sprites = self.sprites[sprite_sheet_name]
+        sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(sprites)
+        self.sprite = sprites[sprite_index]
+        self.animation_count += 1
+        self.update()
+
+    def update(self):
+        self.rect = self.sprite.get_rect(topleft = (self.rect.x, self.rect.y))
+        self.mask = pygame.mask.from_surface(self.sprite)
+
+    def draw(self, win, offset_x, offset_y):    
+        win.blit(self.sprite,(self.rect.x - offset_x,self.rect.y - offset_y))
+
+
+
+class Fruits(pygame.sprite.Sprite):
+    COLOR = (255,0,0)
+    GRAVITY = 1
+    ANIMATION_DELAY  = 1
+
+    def __init__(self, x, y, width, height,fruit_name):
+        super().__init__()
+        self.rect = pygame.Rect(x,y,width,height)
+        self.sprites = load_sprite_sheets("Items","Fruits", 32, 32,False)
+        self.name = fruit_name
+        self.x_vel = 0
+        self.y_vel = 0
+        self.mask = None
+        self.direction = "left"
+        self.animation_count = 0
+        #self.fall_count = 0
+        #self.jump_count = 0
+        self.hit = False
+        self.hit_count = 0
+
+    def make_hit(self):
+        self.hit = True
+        self.hit_count = 0
+
+    
+    def move(self,dx,dy):
+        self.rect.x += dx
+        self.rect.y += dy
+    
+    def move_left(self, vel):
+        self.x_vel = -vel
+        if self.direction != "left":
+            self.direction = "left"
+            self.animation_count = 0
+
+    def move_right(self, vel):
+        self.x_vel = vel
+        if self.direction != "right":
+            self.direction = "right"
+            self.animation_count = 0
+    
+    def loop(self, fps):
+        self.move(self.x_vel,self.y_vel)
+        if self.hit:
+            self.hit_count += 1
+        if self.hit_count > fps:
+            self.hit = False
+            self.hit_count = 0
+        self.update_sprite()
+
+    def landed(self):
+        self.fall_count = 0
+        self.y_vel = 0
+        self.jump_count = 0
+
+    def hit_head(self):
+        self.count = 0
+        self.y_vel *= -1
+        
+    def update_sprite(self):
+        sprite_sheet = self.name
+        sprite_sheet_name = sprite_sheet# + "_" + self.direction
         sprites = self.sprites[sprite_sheet_name]
         sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(sprites)
         self.sprite = sprites[sprite_index]
@@ -342,6 +418,42 @@ class Saw(Object):
         if self.animation_count // self.ANIMATION_DELAY > len(sprites):
             self.animation_count = 0
 
+
+
+'''
+class Fruits(Object):
+    ANIMATION_DELAY = 2
+    def __init__(self, x, y, width, height,fruit_name):
+        super().__init__(x, y, width, height, fruit_name)
+        #self.fruit = load_sprite_sheets("Items",f'Fruits\{fruit_name}', width, height)
+        self.fruit = load_sprite_sheets("Items",'Fruits', width, height)
+        self.image = self.fruit[fruit_name][0]
+        self.mask = pygame.mask.from_surface(self.image)
+        self.animation_count = 0
+        self.animation_name = fruit_name
+
+    def collected(self):
+        #self.fruit = load_sprite_sheets("Fruits","Collected", self.width, self.height)
+        self.animation_name = "Collected"
+
+    def loop(self):
+        sprites = self.fruit[self.animation_name]
+        sprite_index = (self.animation_count // self.ANIMATION_DELAY) % len(sprites)
+        self.image = sprites[sprite_index]
+        if self.animation_count // self.ANIMATION_DELAY > len(sprites):
+            self.animation_count = 0
+        self.rect = self.image.get_rect(topleft = (self.rect.x, self.rect.y))
+        self.mask = pygame.mask.from_surface(self.image)
+        self.animation_count += 1
+
+    def draw(self, win, offset_x, offset_y):
+        # Get the non-transparent bounding box of the sprite
+        non_transparent_rect = self.image.get_bounding_rect()
+
+        # Draw the sprite on the screen considering the offset and non-transparent bounding box
+        win.blit(self.image.subsurface(non_transparent_rect), (self.rect.x - offset_x, self.rect.y - offset_y + non_transparent_rect.y))
+'''
+
 def get_background(name):
     image = pygame.image.load(join("assets","Background",name))
     _, _, width, height =  image.get_rect()
@@ -413,8 +525,10 @@ def handle_move(player, objects, enemies):
     for  obj in  to_check:
         if obj and (obj.name == "fire" or obj and obj.name == "saw" or obj.name == 'enemy'):
             player.make_hit()
-    if obj and obj.name == "End":
-            player.next_phase()
+        if obj and obj.name in ("Apple","Banana","Cherries","Kiwi","Melon","Orange","Pinapple","Strawberry"):
+            player.make_point()
+            obj.collected()
+
 
 def collide_enemy(enemy, objects, dx):
     enemy.move(dx, 0)
@@ -481,34 +595,41 @@ def reset_game(player):
 
 def main(window):
     clock = pygame.time.Clock()
-    background, bg_image = get_background("Gray.png")
+    background, bg_image = get_background("Green.png")
     block_size = 96
 
     player  = Player(100, 100, 50, 50)
-    enemy1 = Enemy(120,HEIGHT - block_size - 64,50,50)   
-    enemies = [enemy1] 
-    floor = [Block(i * block_size,HEIGHT - block_size, block_size) for i in range(-WIDTH // block_size, WIDTH *2 // block_size)]
-    floor2 = [Block(i * block_size,HEIGHT - block_size * 13, block_size) for i in range(WIDTH // block_size, WIDTH // block_size + 5)]
+       
+    enemies_position = [(1.25,1),(-13,18),(-14,18),(-20,18),(-21,18),(-24,18),(-25,18),(-26,18)]
+    enemies = [Enemy(block_size * i[0],HEIGHT - block_size*i[1] - 64,50,50) for i in enemies_position]
+
+    floor_position = [(1,-3,0,3),(13,1,0,1),(18,-3,0,-1),(23,-3,0,-2),(23,-2,2,-1)]
+    floors = [[Block(i * block_size,HEIGHT - block_size * j[0], block_size) for i in range((WIDTH * j[1] + j[2] *  block_size)// block_size, WIDTH * j[3] // block_size)] for j in floor_position]
+
+    block_columns_positions = {3:(1,4),7:(2,5),11:(0,3),13:(-1,2),17:(2,5),19:(-2,1),23:(-3,0),29:(-4,-1),-3:(1,4),-7:(2,5),-11:(0,3),-13:(-1,2),-17:(2,5),-19:(-2,1),-23:(-3,0),-29:(-4,-1)}
+    block_columns = [[Block(block_size * k,i * block_size, block_size) for i in range(v[0],v[1])] for k,v in block_columns_positions.items()]
     
-    block_column_1 = [Block(block_size * 8,i * block_size, block_size) for i in range(1,4)]
-    block_column_2 = [Block(block_size * -3,i * block_size, block_size) for i in range(2,5)]
-    block_column_3 = [Block(block_size * 12,i * block_size, block_size) for i in range(3,5)]
-    float_blocks = [Block(block_size * 7, HEIGHT - block_size * 11, block_size),Block(0, HEIGHT - block_size * 2, block_size),Block(block_size * 4, HEIGHT - block_size * 3, block_size), Block(block_size * 6, HEIGHT - block_size * 7, block_size),Block(block_size * 9, HEIGHT - block_size * 9, block_size),Block(block_size * 1, HEIGHT - block_size * 6, block_size), Block(block_size * 11, HEIGHT - block_size * 14, block_size), Block(block_size * 7, HEIGHT - block_size * 17, block_size)]
+    float_blocks_positions = [(7,11),(0,2),(4,3),(6,7),(9,9),(1,6),(11,14),(7,17),(-7,11),(-4,3),(-6,7),(-9,9),(-1,6),(-11,14),(-7,17),(-12,19),(-18,19),(-32,19),(-24,19),(7,19),(-21,21),(-22,24),(-32,24),(-19,24),(-12,24)]
+    float_blocks = [Block(block_size * l[0], HEIGHT - block_size * l[1], block_size) for l in float_blocks_positions]
+    
     fire_position_adjusted = 16 + block_size//2
-    fires = [Fire(float_blocks[0].rect.x + fire_position_adjusted, float_blocks[0].rect.y - fire_position_adjusted, 16, 32),
-             Fire(float_blocks[1].rect.x + fire_position_adjusted, float_blocks[1].rect.y - fire_position_adjusted, 16, 32), 
-             Fire(float_blocks[2].rect.x + fire_position_adjusted, float_blocks[2].rect.y - fire_position_adjusted, 16, 32),
-             Fire(float_blocks[3].rect.x + fire_position_adjusted, float_blocks[3].rect.y - fire_position_adjusted, 16, 32),
-             Fire(float_blocks[4].rect.x + fire_position_adjusted, float_blocks[4].rect.y - fire_position_adjusted, 16, 32)]
+    fires = [Fire(float_blocks[i].rect.x + fire_position_adjusted, float_blocks[i].rect.y - fire_position_adjusted, 16, 32) for i in range(0,16,2)]
+    
     saws = [Saw(-90, HEIGHT - block_size  - 80, 38, 38),
-            Saw(floor2[2].rect.x, floor2[2].rect.y - block_size + 8, 38, 38)]
-    end_point = EndCheckPoint(floor2[4].rect.x, floor2[4].rect.y - block_size - 24, 64,64)
+            Saw(floors[0][4].rect.x, floors[0][4].rect.y - block_size + 8, 38, 38)]
+    end_point = EndCheckPoint(floors[0][8].rect.x, floors[0][8].rect.y - block_size - 24, 64,64)
+    
+    fruits = [Fruits(40, HEIGHT - block_size * 3, 22, 38,"Melon")]
+    
     for fire in fires:
         fire.on()
     for saw in saws:
         saw.on()
     
-    objects = [*floor,*floor2,*float_blocks , *fires, *saws, *block_column_1, *block_column_2, *block_column_3,end_point]
+    block_columns = [block for sublist in block_columns for block in sublist]
+    floors = [floor for sublist in floors for floor in sublist]
+
+    objects = [*floors,*float_blocks , *fires, *block_columns,end_point,*saws,*fruits]
 
     offset_x = 0
     offset_y = 0
@@ -535,6 +656,8 @@ def main(window):
         for enemy in enemies:
             enemy.loop(FPS)
             handle_move_enemy(enemy, objects)
+        for fruit in fruits:
+            fruit.loop()
 
         handle_move(player, objects, enemies)
         draw(window, background, bg_image, player, objects, enemies, offset_x, offset_y)

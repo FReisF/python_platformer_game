@@ -29,7 +29,9 @@ def flip(sprites):
     return [pygame.transform.flip(sprite, True, False) for sprite in sprites]
 
 def load_sprite_sheets(dir1,dir2, width, height, direction = False):
-    path = join("assets",dir1,dir2)
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    path = os.path.join(script_dir,"assets",dir1,dir2)
+    print(path)
     images = [f for f in listdir(path) if isfile(join(path,f))]
 
     all_sprites = {}
@@ -53,7 +55,8 @@ def load_sprite_sheets(dir1,dir2, width, height, direction = False):
     return all_sprites
 
 def get_block(size):
-    path = join("assets","Terrain","Terrain.png")
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    path = join(script_dir,"assets","Terrain","Terrain.png")
     image = pygame.image.load(path).convert_alpha()
     surface = pygame.Surface((size,size), pygame.SRCALPHA, 32)
     rect = pygame.Rect(0, 0, size, size)
@@ -285,7 +288,7 @@ class Block(Object):
 class EndCheckPoint(Object):
     def __init__(self,x,y,width,height):
         super().__init__(x,y,width,height,"End")
-        self.endpoint = load_sprite_sheets("Items","Checkpoints\End",width,height)
+        self.endpoint = load_sprite_sheets("Items","Checkpoints//End",width,height)
         self.image = self.endpoint["End (Idle)"][0]
         self.mask = pygame.mask.from_surface(self.image)
                 
@@ -343,7 +346,8 @@ class Saw(Object):
             self.animation_count = 0
 
 def get_background(name):
-    image = pygame.image.load(join("assets","Background",name))
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    image = pygame.image.load(join(script_dir,"assets","Background",name))
     _, _, width, height =  image.get_rect()
     tiles = []
     for i in range(WIDTH//width + 1):
